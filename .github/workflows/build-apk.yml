@@ -19,13 +19,7 @@ jobs:
           mkdir -p project
           unzip -o 8ball_live_android_apk_build_ready.zip -d project
           echo "Files:"
-          find project -maxdepth 5 -type f | head -100
-
-      - name: Find project directory
-        run: |
-          PROJECT_DIR=$(find "$GITHUB_WORKSPACE/project" \( -name "settings.gradle" -o -name "settings.gradle.kts" \) -print -quit | xargs -r dirname)
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project directory: $PROJECT_DIR"
+          find project -maxdepth 6 -type f | head -200
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -36,24 +30,37 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Fix JVM target
-        working-directory: ${{ env.PROJECT_DIR }}
+      - name: Find Gradle wrapper
         run: |
-          find . -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -print
-
-          find . -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -exec sed -i \
-            -e 's/JavaVersion\.VERSION_1_8/JavaVersion.VERSION_17/g' \
-            -e "s/jvmTarget = ['\"]1\.8['\"]/jvmTarget = '17'/g" \
-            {} \;
+          echo "Searching for gradlew..."
+          find "$GITHUB_WORKSPACE/project" -type f -name "gradlew" -print
 
       - name: Build APK
-        working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          chmod +x ./gradlew
+          GRADLEW=$(find "$GITHUB_WORKSPACE/project" -type f -name "gradlew" -print -quit)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "ERROR: gradlew not found!"
+            echo "Project files:"
+            find "$GITHUB_WORKSPACE/project" -maxdepth 6 -type f | head -200
+            exit 1
+          fi
+
+          echo "Found Gradle wrapper: $GRADLEW"
+
+          chmod +x "$GRADLEW"
+          cd "$(dirname "$GRADLEW")"
+
           ./gradlew assembleDebug
+
+      - name: Find APK
+        run: |
+          echo "Searching for APK..."
+          find "$GITHUB_WORKSPACE/project" -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-debug-apk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/*.apk
+          path: ${{ github.workspace }}/project/**/*.apk
+          if-no-files-found: error
