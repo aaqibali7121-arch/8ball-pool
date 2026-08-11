@@ -1,57 +1,88 @@
+It looks like you've provided a GitHub Actions workflow file for building an Android APK. The workflow is set up to trigger on manual dispatch or a push to the `main` branch. It checks out the repository, extracts an Android project from a zip file, and sets up Java 17.
+
+The last step, "Set up Gradle," is incomplete. To fully set up Gradle for your project within the GitHub Actions environment, you typically need to:
+
+1.  Cache Gradle dependencies: This speeds up subsequent builds by reusing downloaded dependencies.
+2.  Set up Gradle wrapper: Ensure the correct Gradle version specified in your project is used.
+
+Here's how you can complete the "Set up Gradle" step and add a step to build the APK:
+
+```yaml
 name: Build APK
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
+ branches:
+ - main
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+ runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+ steps:
+ - name: Checkout repository
+ uses: actions/checkout@v4
 
-      - name: Extract Android project
-        run: |
-          mkdir -p project
-          unzip -o 8ball_live_android_apk_build_ready.zip -d project
-          echo "Files:"
-          find project -maxdepth 4 -type f | head -100
+ - name: Extract Android project
 
-      - name: Find project directory
-        run: |
-          PROJECT_DIR=$(find "$GITHUB_WORKSPACE/project" -name "settings.gradle" -o -name "settings.gradle.kts" | head -1 | xargs dirname)
-          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project directory: $PROJECT_DIR"
+ 
+ run: |
+ mkdir -p project
+ unzip -o 8ball_live_android_apk_build_ready.zip -d project
+ echo "Files:"
+ find project -maxdepth 4 -type f | head -100
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
+ - name: Find project directory
+ run: |
+ PROJECT_DIR=$(find "$GITHUB_WORKSPACE/project" -name "settings.gradle" -o -name "settings.gradle.kts" | head -1 | xargs dirname)
+ echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+ echo "Project directory: $PROJECT_DIR"
 
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
+ - name: Set up JDK 17
+ uses: actions/setup-java@v4
+ with:
+ distribution: temurin
+ java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+ - name: Cache Gradle dependencies
+ uses: actions/cache@v3
+ with:
+ path: |
+ ~/.gradle/caches
+ ~/.gradle/wrapper
+ key: ${{ runner.os }}-gradle-${{ hashFiles('/.gradle') }}
+ restore-keys: |
+ ${{ runner.os }}-gradle-
 
-      - name: Build APK
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: |
-          gradle assembleDebug --stacktrace
+ - name: Grant execute permission for gradlew
+ run: chmod +x "$PROJECT_DIR/gradlew"
 
-      - name: Find APK
-        run: |
-          find "$PROJECT_DIR" -type f -name "*.apk" -print
+ - name: Build APK
+ run: ./gradlew assembleDebug # Or assembleRelease if you prefer
+ working-directory: ${{ env.PROJECT_DIR }}
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: 8Ball-Live-Assistant-APK
-          path: ${{ env.PROJECT_DIR }}/**/build/outputs/apk/**/*.apk
+ - name: Upload APK
+ uses: actions/upload-artifact@v3
+ with:
+ name: app-debug.apk # Or app-release.apk
+ path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk # Adjust path if needed for release builds
+```
+
+Explanation of Added Steps:
+
+   Cache Gradle dependencies: This step uses `actions/cache` to cache your Gradle dependencies. This significantly speeds up build times on subsequent runs because Gradle won't need to re-download everything.
+   Grant execute permission for gradlew: This ensures that the Gradle wrapper script (`gradlew`) has execute permissions, which is necessary to run it.
+   Build APK: This step executes the Gradle wrapper to build your Android application.
+    `./gradlew assembleDebug` will build a debug APK. If you intend to build a release APK, you would use `./gradlew assembleRelease`.
+    `working-directory: ${{ env.PROJECT_DIR }}` ensures that the command is run from the root of your Android project.
+   Upload APK: This step uses `actions/upload-artifact` to save the generated APK as a build artifact. You can then download this artifact from the GitHub Actions run page.
+
+To resolve a specific problem:
+
+Please tell me what the problem is. For example:
+   Are you getting a specific error message?
+   Is the build failing at a particular step?
+   Is the generated APK not working as expected?
+
+Once you provide more details about the issue, I can offer more targeted solutions.
