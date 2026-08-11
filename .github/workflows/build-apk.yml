@@ -18,17 +18,14 @@ jobs:
         run: |
           mkdir -p project
           unzip -o 8ball_live_android_apk_build_ready.zip -d project
-          echo "Extracted files:"
-          find project -maxdepth 3 -type f | head -100
+          echo "Files:"
+          find project -maxdepth 4 -type f | head -100
 
       - name: Find project directory
         run: |
-          PROJECT_DIR=$(find "$GITHUB_WORKSPACE/project" -name settings.gradle.kts -o -name settings.gradle | head -1 | xargs -r dirname)
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "Android Gradle project not found"
-            exit 1
-          fi
+          PROJECT_DIR=$(find "$GITHUB_WORKSPACE/project" -name "settings.gradle" -o -name "settings.gradle.kts" | head -1 | xargs dirname)
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project directory: $PROJECT_DIR"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -36,28 +33,25 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK
-        run: |
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Make Gradle executable
-        run: |
-          if [ -f "$PROJECT_DIR/gradlew" ]; then
-            chmod +x "$PROJECT_DIR/gradlew"
-          else
-            echo "gradlew not found"
-            exit 1
-          fi
-
       - name: Build APK
         working-directory: ${{ env.PROJECT_DIR }}
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          gradle assembleDebug --stacktrace
+
+      - name: Find APK
+        run: |
+          find "$PROJECT_DIR" -type f -name "*.apk" -print
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: 8ball-live-assistant-apk
-          path: ${{ env.PROJECT_DIR }}/app/build/outputs/apk/debug/app-debug.apk
+          name: 8Ball-Live-Assistant-APK
+          path: ${{ env.PROJECT_DIR }}/**/build/outputs/apk/**/*.apk
